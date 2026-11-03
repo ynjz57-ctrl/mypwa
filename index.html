@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>目標手帳 Pro</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'media',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Inter & FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Inline SVG Favicon Data URI -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='25' fill='%232563eb'/%3E%3Cpath d='M30 52l15 15 28-32' fill='none' stroke='%23ffffff' stroke-width='10' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        input, textarea, select {
+            -webkit-user-select: text;
+            user-select: text;
+            font-size: 16px !important; /* 防止 iOS Safari 自動放大 */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+            overflow-x: hidden;
+            height: 100%;
+        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #0f172a;
+                color: #f1f5f9;
+            }
+        }
+        button:active, .interactive-card:active {
+            transform: scale(0.96);
+            opacity: 0.9;
+            transition: transform 0.1s ease, opacity 0.1s ease;
+        }
+        /* 自定義捲軸隱藏但可滾動 */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col max-w-md mx-auto shadow-2xl relative bg-white dark:bg-slate-900 border-x border-slate-100 dark:border-slate-800">
+
+    <!-- Header 頂部區域 -->
+    <header class="pt-12 pb-4 px-5 bg-gradient-to-b from-brand-50 to-white dark:from-slate-800 dark:to-slate-900 sticky top-0 z-20 backdrop-blur-md bg-opacity-90 dark:bg-opacity-90 border-b border-slate-100 dark:border-slate-800">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <span class="text-xs font-semibold tracking-wider text-brand-600 dark:text-brand-400 uppercase">Daily Habit & Reflection</span>
+                <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">目標手帳 Pro</h1>
+            </div>
+            <button id="openAddModalBtn" class="w-11 h-11 rounded-full bg-brand-600 text-white flex items-center justify-center shadow-lg shadow-brand-500/30 hover:bg-brand-700 transition">
+                <i class="fa-solid fa-plus text-lg"></i>
+            </button>
+        </div>
+
+        <!-- 數據統計與進度條卡片 -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-700">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center text-sm font-bold">
+                        <i class="fa-solid fa-fire"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400 font-medium">連續打卡</div>
+                        <div id="streakCount" class="text-sm font-bold text-slate-800 dark:text-slate-100">0 天</div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs text-slate-500 dark:text-slate-400 font-medium">今日達成率</div>
+                    <div id="completionRateText" class="text-sm font-bold text-brand-600 dark:text-brand-400">0%</div>
+                </div>
+            </div>
+            <!-- 進度條 -->
+            <div class="w-full bg-slate-100 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                <div id="progressBar" class="bg-brand-600 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要內容區 (可切換標籤) -->
+    <main class="flex-1 overflow-y-auto px-5 py-4 pb-24 no-scrollbar">
+        <!-- 分類篩選列 -->
+        <div class="flex space-x-2 mb-4 overflow-x-auto no-scrollbar pb-1" id="categoryFilterContainer">
+            <button data-category="all" class="category-filter px-4 py-1.5 rounded-full text-xs font-semibold bg-brand-600 text-white transition whitespace-nowrap shadow-sm">全部目標</button>
+            <button data-category="健康" class="category-filter px-4 py-1.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition whitespace-nowrap">健康生活</button>
+            <button data-category="工作" class="category-filter px-4 py-1.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition whitespace-nowrap">工作學習</button>
+            <button data-category="生活" class="category-filter px-4 py-1.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition whitespace-nowrap">日常習慣</button>
+        </div>
+
+        <!-- 目標列表容器 -->
+        <div id="habitsContainer" class="space-y-3">
+            <!-- 動態載入目標卡片 -->
+        </div>
+
+        <!-- 空狀態提示 -->
+        <div id="emptyState" class="hidden flex flex-col items-center justify-center py-12 text-center">
+            <div class="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-2xl mb-3">
+                <i class="fa-solid fa-clipboard-list"></i>
+            </div>
+            <p class="text-sm font-medium text-slate-600 dark:text-slate-400">目前尚無目標，點擊右上角開始新增！</p>
+        </div>
+    </main>
+
+    <!-- 底部導覽列 -->
+    <nav class="absolute bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700 py-2.5 px-6 flex justify-around items-center z-20">
+        <button onclick="switchTab('habits')" id="navHabitsBtn" class="flex flex-col items-center text-brand-600 dark:text-brand-400 transition">
+            <i class="fa-solid fa-bullseye text-lg mb-0.5"></i>
+            <span class="text-[10px] font-semibold">目標打卡</span>
+        </button>
+        <button onclick="switchTab('reflection')" id="navReflectionBtn" class="flex flex-col items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition">
+            <i class="fa-solid fa-pen-nib text-lg mb-0.5"></i>
+            <span class="text-[10px] font-semibold">每日反思</span>
+        </button>
+    </nav>
+
+    <!-- 反思分頁內容容器 (預設隱藏) -->
+    <div id="reflectionView" class="hidden absolute inset-0 top-[125px] bottom-[60px] bg-white dark:bg-slate-900 z-10 px-5 py-4 overflow-y-auto no-scrollbar">
+        <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">今日手帳反思</h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">記錄今天的收穫、感恩與需改進的地方。</p>
+        
+        <div class="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-700 mb-4">
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2">今天最值得感恩的一件事：</label>
+            <textarea id="reflectionGratitude" rows="3" class="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none" placeholder="寫下讓您感恩的人事物..."></textarea>
+        </div>
+
+        <div class="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-700 mb-4">
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2">今天學到了什麼 / 明日改進：</label>
+            <textarea id="reflectionImprovement" rows="3" class="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none" placeholder="記錄自我成長點滴..."></textarea>
+        </div>
+
+        <button onclick="saveReflection()" class="w-full py-3 bg-brand-600 text-white font-semibold rounded-xl shadow-lg shadow-brand-500/30 hover:bg-brand-700 transition">
+            儲存今日反思
+        </button>
+    </div>
+
+    <!-- 新增目標 Modal -->
+    <div id="addModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white dark:bg-slate-800 w-full max-w-sm rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl transform transition-transform duration-300">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-slate-800 dark:text-white">新增每日目標</h3>
+                <button id="closeModalBtn" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form id="addHabitForm" onsubmit="handleFormSubmit(event)">
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">目標名稱</label>
+                    <input type="text" id="habitNameInput" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="例如：每日閱讀 30 分鐘">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">分類標籤</label>
+                    <select id="habitCategoryInput" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        <option value="健康">健康生活</option>
+                        <option value="工作">工作學習</option>
+                        <option value="生活">日常習慣</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full py-3 bg-brand-600 text-white font-semibold rounded-xl shadow-lg shadow-brand-500/30 hover:bg-brand-700 transition">
+                    確認新增
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // 初始化應用資料狀態
+        let habits = JSON.parse(localStorage.getItem('habit_tracker_habits')) || [
+            { id: '1', name: '晨間喝水 500cc', category: '健康', completedDates: [] },
+            { id: '2', name: '專注工作 2 小時', category: '工作', completedDates: [] },
+            { id: '3', name: '閱讀書本 20 分鐘', category: '生活', completedDates: [] }
+        ];
+
+        let reflections = JSON.parse(localStorage.getItem('habit_tracker_reflections')) || {};
+        let currentCategory = 'all';
+
+        // 取得今日日期字串 YYYY-MM-DD
+        function getTodayString() {
+            const now = new Date();
+            return now.toISOString().split('T')[0];
+        }
+
+        // 儲存至 LocalStorage
+        function saveData() {
+            localStorage.setItem('habit_tracker_habits', JSON.stringify(habits));
+            localStorage.setItem('habit_tracker_reflections', JSON.stringify(reflections));
+            renderApp();
+        }
+
+        // 切換導覽標籤
+        function switchTab(tab) {
+            const habitsContainer = document.querySelector('main');
+            const reflectionView = document.getElementById('reflectionView');
+            const navHabitsBtn = document.getElementById('navHabitsBtn');
+            const navReflectionBtn = document.getElementById('navReflectionBtn');
+            const openAddBtn = document.getElementById('openAddModalBtn');
+
+            if (tab === 'habits') {
+                reflectionView.classList.add('hidden');
+                habitsContainer.classList.remove('hidden');
+                openAddBtn.classList.remove('hidden');
+                navHabitsBtn.className = "flex flex-col items-center text-brand-600 dark:text-brand-400 transition";
+                navReflectionBtn.className = "flex flex-col items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition";
+            } else {
+                habitsContainer.classList.add('hidden');
+                reflectionView.classList.remove('hidden');
+                openAddBtn.classList.add('hidden');
+                navReflectionBtn.className = "flex flex-col items-center text-brand-600 dark:text-brand-400 transition";
+                navHabitsBtn.className = "flex flex-col items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition";
+                loadReflectionData();
+            }
+        }
+
+        // 載入反思資料到輸入框
+        function loadReflectionData() {
+            const today = getTodayString();
+            const todayReflection = reflections[today] || { gratitude: '', improvement: '' };
+            document.getElementById('reflectionGratitude').value = todayReflection.gratitude;
+            document.getElementById('reflectionImprovement').value = todayReflection.improvement;
+        }
+
+        // 儲存反思
+        function saveReflection() {
+            const today = getTodayString();
+            const gratitude = document.getElementById('reflectionGratitude').value;
+            const improvement = document.getElementById('reflectionImprovement').value;
+            reflections[today] = { gratitude, improvement };
+            saveData();
+            showToast('反思已成功儲存！');
+        }
+
+        // 輕量 Toast 提示
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = "fixed top-5 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-4 py-2 rounded-full text-xs font-medium shadow-xl z-50 transition-all duration-300";
+            toast.innerText = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 2000);
+        }
+
+        // 切換打卡狀態
+        function toggleCheck(id) {
+            const today = getTodayString();
+            habits = habits.map(habit => {
+                if (habit.id === id) {
+                    const isCompleted = habit.completedDates.includes(today);
+                    if (isCompleted) {
+                        return { ...habit, completedDates: habit.completedDates.filter(d => d !== today) };
+                    } else {
+                        return { ...habit, completedDates: [...habit.completedDates, today] };
+                    }
+                }
+                return habit;
+            });
+            saveData();
+        }
+
+        // 刪除目標
+        function deleteHabit(id) {
+            habits = habits.filter(habit => habit.id !== id);
+            saveData();
+            showToast('已刪除目標');
+        }
+
+        // 計算連續打卡天數
+        function calculateStreak() {
+            if (habits.length === 0) return 0;
+            let streak = 0;
+            let currentDate = new Date();
+            
+            while (true) {
+                const dateStr = currentDate.toISOString().split('T')[0];
+                const allCompleted = habits.every(h => h.completedDates.includes(dateStr));
+                if (allCompleted && habits.length > 0) {
+                    streak++;
+                    currentDate.setDate(currentDate.getDate() - 1);
+                } else {
+                    // 若今天尚未全部完成，檢查昨天是否連續
+                    if (streak === 0 && dateStr === getTodayString()) {
+                        currentDate.setDate(currentDate.getDate() - 1);
+                        continue;
+                    }
+                    break;
+                }
+            }
+            return streak;
+        }
+
+        // 渲染主畫面
+        function renderApp() {
+            const today = getTodayString();
+            const filteredHabits = currentCategory === 'all' ? habits : habits.filter(h => h.category === currentCategory);
+            
+            // 更新進度與統計
+            const total = habits.length;
+            const completedCount = habits.filter(h => h.completedDates.includes(today)).length;
+            const rate = total === 0 ? 0 : Math.round((completedCount / total) * 100);
+            
+            document.getElementById('completionRateText').innerText = `${rate}%`;
+            document.getElementById('progressBar').style.width = `${rate}%`;
+            document.getElementById('streakCount').innerText = `${calculateStreak()} 天`;
+
+            // 渲染列表
+            const container = document.getElementById('habitsContainer');
+            const emptyState = document.getElementById('emptyState');
+            
+            if (filteredHabits.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            container.innerHTML = filteredHabits.map(habit => {
+                const isChecked = habit.completedDates.includes(today);
+                return `
+                    <div class="interactive-card bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between transition">
+                        <div class="flex items-center space-x-3.5 flex-1 cursor-pointer" onclick="toggleCheck('${habit.id}')">
+                            <div class="w-6 h-6 rounded-lg border-2 flex items-center justify-center transition ${isChecked ? 'bg-brand-600 border-brand-600 text-white' : 'border-slate-300 dark:border-slate-600'}">
+                                ${isChecked ? '<i class="fa-solid fa-check text-xs"></i>' : ''}
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-slate-800 dark:text-slate-100 ${isChecked ? 'line-through text-slate-400 dark:text-slate-500' : ''}">${habit.name}</h4>
+                                <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 font-medium">${habit.category}</span>
+                            </div>
+                        </div>
+                        <button onclick="deleteHabit('${habit.id}')" class="text-slate-300 hover:text-rose-500 dark:text-slate-600 dark:hover:text-rose-400 p-2 transition">
+                            <i class="fa-solid fa-trash-can text-sm"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Modal 控制邏輯
+        const modal = document.getElementById('addModal');
+        document.getElementById('openAddModalBtn').onclick = () => modal.classList.remove('hidden');
+        document.getElementById('closeModalBtn').onclick = () => modal.classList.add('hidden');
+
+        // 表單送出新增目標
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const name = document.getElementById('habitNameInput').value.trim();
+            const category = document.getElementById('habitCategoryInput').value;
+            if (!name) return;
+
+            const newHabit = {
+                id: Date.now().toString(),
+                name,
+                category,
+                completedDates: []
+            };
+
+            habits.push(newHabit);
+            saveData();
+            modal.classList.add('hidden');
+            document.getElementById('addHabitForm').reset();
+            showToast('成功新增目標！');
+        }
+
+        // 分類過濾按鈕事件
+        document.querySelectorAll('.category-filter').forEach(btn => {
+            btn.onclick = (e) => {
+                document.querySelectorAll('.category-filter').forEach(b => {
+                    b.className = "category-filter px-4 py-1.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition whitespace-nowrap";
+                });
+                e.target.className = "category-filter px-4 py-1.5 rounded-full text-xs font-semibold bg-brand-600 text-white transition whitespace-nowrap shadow-sm";
+                currentCategory = e.target.getAttribute('data-category');
+                renderApp();
+            };
+        });
+
+        // 動態註冊 Service Worker 實現離線快取與 PWA 標準
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                self.addEventListener('install', (e) => {
+                    e.waitUntil(
+                        caches.open('habit-tracker-v1').then((cache) => {
+                            return cache.addAll(['./', './index.html']);
+                        })
+                    );
+                });
+                self.addEventListener('fetch', (e) => {
+                    e.respondWith(
+                        caches.match(e.request).then((response) => {
+                            return response || fetch(e.request);
+                        })
+                    );
+                });
+            `;
+            const blob = new Blob([swCode], { type: 'text/javascript' });
+            const swUrl = URL.createObjectURL(blob);
+            navigator.serviceWorker.register(swUrl).catch(err => console.log('SW registration failed:', err));
+        }
+
+        // 動態產生並插入 Web App Manifest
+        const manifestData = {
+            "name": "目標手帳 Pro",
+            "short_name": "目標手帳",
+            "start_url": "./",
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#2563eb",
+            "icons": [{
+                "src": document.querySelector("link[rel='icon']").href,
+                "sizes": "100x100",
+                "type": "image/svg+xml"
+            }]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
+        const manifestUrl = URL.createObjectURL(manifestBlob);
+        const manifestLink = document.createElement('link');
+        manifestLink.rel = 'manifest';
+        manifestLink.href = manifestUrl;
+        document.head.appendChild(manifestLink);
+
+        // 初始渲染
+        renderApp();
+    </script>
+</body>
+</html>
